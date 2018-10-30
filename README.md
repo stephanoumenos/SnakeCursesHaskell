@@ -1,0 +1,3 @@
+# SnakeCursesHaskell
+
+Work in progress

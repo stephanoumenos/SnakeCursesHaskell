@@ -12,6 +12,17 @@ data Map = Map Snake Food deriving (Show)
 makeNewSnake :: Int -> Int -> Snake
 makeNewSnake x y = Snake "UP" [(x, y), (x, y-1), (x, y-2)]
 
+oppositeOrientation :: String -> String
+oppositeOrientation "UP" = "DOWN"
+oppositeOrientation "DOWN" = "UP"
+oppositeOrientation "LEFT" = "RIGHT"
+oppositeOrientation "RIGHT" = "LEFT"
+
+changeSnakeOrientation :: String -> Snake -> Snake
+changeSnakeOrientation new_d (Snake d c) = if new_d == oppositeOrientation d
+                                            then (Snake d c)
+                                            else (Snake new_d c)
+
 getRand :: Int -> Int
 getRand max = unsafePerformIO $ randomRIO (0, max)
 

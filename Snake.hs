@@ -6,8 +6,8 @@ import UI.NCurses
 data Snake = Snake String [(Int, Int)] deriving (Show)
 -- The food has its coordinates
 data Food = Food Int Int deriving (Show)
-
-data Map = Map Snake Food deriving (Show)
+-- The map has a snake, a food, and its boundaries (max_x and max_y)
+data Map = Map Snake Food Int Int deriving (Show)
 
 makeNewSnake :: Int -> Int -> Snake
 makeNewSnake x y = Snake "UP" [(x, y), (x, y-1), (x, y-2)]
@@ -19,9 +19,8 @@ oppositeOrientation "LEFT" = "RIGHT"
 oppositeOrientation "RIGHT" = "LEFT"
 
 changeSnakeOrientation :: String -> Snake -> Snake
-changeSnakeOrientation new_d (Snake d c) = if new_d == oppositeOrientation d
-                                            then (Snake d c)
-                                            else (Snake new_d c)
+changeSnakeOrientation new_d (Snake d c) | new_d == oppositeOrientation d = (Snake d c)
+                                         | otherwise = (Snake new_d c)
 
 getRand :: Int -> Int
 getRand max = unsafePerformIO $ randomRIO (0, max)
@@ -32,22 +31,38 @@ randomFood max_x max_y = Food randomX randomY
           randomY = getRand max_y
 
 spawnFood :: Int -> Int -> Snake -> Food
-spawnFood max_x max_y (Snake d c) = if (foodInSnake newFood (Snake d c))
-                                     then spawnFood max_x max_y (Snake d c)
-                                     else newFood
+spawnFood max_x max_y s | foodInSnake newFood s = spawnFood max_x max_y s
+                        | otherwise = newFood
     where newFood = randomFood max_x max_y
 
 initialMap :: Int -> Int -> Map
-initialMap x_size y_size = Map newSnake newFood
+initialMap x_size y_size = Map newSnake newFood x_size y_size
     where newSnake = makeNewSnake (quot x_size 2) (quot y_size 2)
           newFood = spawnFood x_size y_size newSnake
 
+snakeNewHead :: Snake -> (Int, Int)
+snakeNewHead (Snake d c) | d == "UP" = (fst $ head c, (snd $ head c) + 1)
+                         | d == "DOWN" = (fst $ head c, (snd $ head c) - 1)
+                         | d == "LEFT" =  ((fst $ head c)-1, snd $ head c)
+                         | d == "RIGHT" =  ((fst $ head c)+1, snd $ head c)
+
+nextMovementValid :: Map -> Bool
+nextMovementValid (Map s f x_max y_max ) | foodInSnake f s = False
+                                         | coordinateInSnake newHead s = False
+                                         | fst newHead > x_max = False
+                                         | fst newHead < 0 = False
+                                         | snd newHead > y_max = False
+                                         | snd newHead < 0 = False
+                                         | otherwise = True
+    where newHead = snakeNewHead s
+
 moveSnake :: Snake -> Snake
 moveSnake (Snake d c) = Snake d newCoordinates
-    where newCoordinates | d == "UP" =  [(fst $ head c, (snd $ head c) + 1)] ++ init c
-                         | d == "DOWN" =  [(fst $ head c, (snd $ head c) - 1)] ++ init c
-                         | d == "LEFT" =  [((fst $ head c)-1, snd $ head c)] ++ init c
-                         | d == "RIGHT" =  [((fst $ head c)+1, snd $ head c)] ++ init c
+    where newCoordinates = [snakeNewHead (Snake d c)] ++ init c
 
 foodInSnake :: Food -> Snake -> Bool
 foodInSnake (Food x y) (Snake _ c) = elem (x, y) c
+
+coordinateInSnake :: (Int, Int) -> Snake -> Bool
+coordinateInSnake coordinate (Snake d c) = elem coordinate c
+

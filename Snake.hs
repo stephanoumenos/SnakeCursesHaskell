@@ -47,8 +47,7 @@ snakeNewHead (Snake d c) | d == "UP" = (fst $ head c, (snd $ head c) + 1)
                          | d == "RIGHT" =  ((fst $ head c)+1, snd $ head c)
 
 nextMovementValid :: Map -> Bool
-nextMovementValid (Map s f x_max y_max ) | foodInSnake f s = False
-                                         | coordinateInSnake newHead s = False
+nextMovementValid (Map s f x_max y_max ) | coordinateInSnake newHead s = False
                                          | fst newHead > x_max = False
                                          | fst newHead < 0 = False
                                          | snd newHead > y_max = False
@@ -56,13 +55,34 @@ nextMovementValid (Map s f x_max y_max ) | foodInSnake f s = False
                                          | otherwise = True
     where newHead = snakeNewHead s
 
+eatingFoodInNextMovement :: Map -> Bool
+eatingFoodInNextMovement (Map s f _ _) | foodInCoordinate f (snakeNewHead s) = True
+                                       | otherwise = False
+
 moveSnake :: Snake -> Snake
 moveSnake (Snake d c) = Snake d newCoordinates
     where newCoordinates = [snakeNewHead (Snake d c)] ++ init c
 
+moveSnakeEatingFood :: Snake -> Snake
+moveSnakeEatingFood (Snake d c) = Snake d newCoordinates
+    where newCoordinates = [snakeNewHead (Snake d c)] ++ c
+
 foodInSnake :: Food -> Snake -> Bool
 foodInSnake (Food x y) (Snake _ c) = elem (x, y) c
 
+foodInCoordinate :: Food -> (Int, Int) -> Bool
+foodInCoordinate (Food x y) c = (x, y) == c
+
 coordinateInSnake :: (Int, Int) -> Snake -> Bool
 coordinateInSnake coordinate (Snake d c) = elem coordinate c
+
+iterateMap :: Map -> Map
+iterateMap (Map s f x y) = Map (moveSnake s) f x y
+
+iterateMapEatingFood :: Map -> Map
+iterateMapEatingFood (Map s _ x y) = Map newSnake newFood x y
+    where newSnake = moveSnakeEatingFood s
+          newFood = spawnFood x y s
+
+
 

@@ -1,15 +1,16 @@
 import System.Random
 import System.IO.Unsafe
 import UI.NCurses
+import Control.Monad(when)
 
 -- The Snake has a direction and its body coordinates
-data Snake = Snake String [(Int, Int)] deriving (Show)
+data Snake = Snake String [(Integer, Integer)] deriving (Show)
 -- The food has its coordinates
-data Food = Food Int Int deriving (Show)
+data Food = Food Integer Integer deriving (Show)
 -- The map has a snake, a food, and its boundaries (max_x and max_y)
-data Map = Map Snake Food Int Int deriving (Show)
+data Map = Map Snake Food Integer Integer deriving (Show)
 
-makeNewSnake :: Int -> Int -> Snake
+makeNewSnake :: Integer -> Integer -> Snake
 makeNewSnake x y = Snake "UP" [(x, y), (x, y-1), (x, y-2)]
 
 oppositeOrientation :: String -> String
@@ -22,25 +23,25 @@ changeSnakeOrientation :: String -> Snake -> Snake
 changeSnakeOrientation new_d (Snake d c) | new_d == oppositeOrientation d = (Snake d c)
                                          | otherwise = (Snake new_d c)
 
-getRand :: Int -> Int
+getRand :: Integer -> Integer
 getRand max = unsafePerformIO $ randomRIO (0, max)
 
-randomFood :: Int -> Int -> Food
+randomFood :: Integer -> Integer -> Food
 randomFood max_x max_y = Food randomX randomY
     where randomX = getRand max_x
           randomY = getRand max_y
 
-spawnFood :: Int -> Int -> Snake -> Food
+spawnFood :: Integer -> Integer -> Snake -> Food
 spawnFood max_x max_y s | foodInSnake newFood s = spawnFood max_x max_y s
                         | otherwise = newFood
     where newFood = randomFood max_x max_y
 
-initialMap :: Int -> Int -> Map
+initialMap :: Integer -> Integer -> Map
 initialMap x_size y_size = Map newSnake newFood x_size y_size
     where newSnake = makeNewSnake (quot x_size 2) (quot y_size 2)
           newFood = spawnFood x_size y_size newSnake
 
-snakeNewHead :: Snake -> (Int, Int)
+snakeNewHead :: Snake -> (Integer, Integer)
 snakeNewHead (Snake d c) | d == "UP" = (fst $ head c, (snd $ head c) + 1)
                          | d == "DOWN" = (fst $ head c, (snd $ head c) - 1)
                          | d == "LEFT" =  ((fst $ head c)-1, snd $ head c)
@@ -70,10 +71,10 @@ moveSnakeEatingFood (Snake d c) = Snake d newCoordinates
 foodInSnake :: Food -> Snake -> Bool
 foodInSnake (Food x y) (Snake _ c) = elem (x, y) c
 
-foodInCoordinate :: Food -> (Int, Int) -> Bool
+foodInCoordinate :: Food -> (Integer, Integer) -> Bool
 foodInCoordinate (Food x y) c = (x, y) == c
 
-coordinateInSnake :: (Int, Int) -> Snake -> Bool
+coordinateInSnake :: (Integer, Integer) -> Snake -> Bool
 coordinateInSnake coordinate (Snake d c) = elem coordinate c
 
 iterateMap :: Map -> Map
@@ -84,5 +85,46 @@ iterateMapEatingFood (Map s _ x y) = Map newSnake newFood x y
     where newSnake = moveSnakeEatingFood s
           newFood = spawnFood x y s
 
+drawFood w (Food x y) = updateWindow w $ do
+    moveCursor x y
+    drawString "*"
 
+drawSnake w (Snake d c) = do
+    case c of
+        [] -> return ()
+        x -> updateWindow w $ do
+            moveCursor (fst $ head x) (snd $ head x)
+            drawString "*"
+            drawSnake w (Snake d (tail x))
+            return ()
+
+play w (Map s f x y ) = do
+    let m = (Map s f x y)
+    updateWindow w $ do
+        clear
+    drawSnake w s
+    drawFood w f
+    render
+    if not $ nextMovementValid m
+        then return ()
+        else if eatingFoodInNextMovement m
+            then play w (iterateMapEatingFood m)
+            else
+                play w (iterateMap m)
+
+main = runCurses $ do
+    win <- defaultWindow
+    cid <- newColorID ColorRed ColorWhite 1
+    (h, w) <- screenSize
+    play win (initialMap h w)
+    render
+    waitFor win (\ev -> ev == EventCharacter 'q' || ev == EventCharacter 'Q')
+
+waitFor :: Window -> (Event -> Bool) -> Curses ()
+waitFor w p = loop where
+    loop = do
+        ev <- getEvent w Nothing
+        case ev of
+            Nothing -> loop
+            Just ev' -> if p ev' then return () else loop
 

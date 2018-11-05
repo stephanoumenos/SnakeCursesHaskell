@@ -1,7 +1,7 @@
 import System.Random
 import System.IO.Unsafe
 import UI.NCurses
-import Control.Monad(when)
+import Control.Monad
 
 -- The Snake has a direction and its body coordinates
 data Snake = Snake String [(Integer, Integer)] deriving (Show)
@@ -11,7 +11,7 @@ data Food = Food Integer Integer deriving (Show)
 data Map = Map Snake Food Integer Integer deriving (Show)
 
 makeNewSnake :: Integer -> Integer -> Snake
-makeNewSnake x y = Snake "UP" [(x, y), (x, y-1), (x, y-2)]
+makeNewSnake i j = Snake "UP" [(i, j), (i-1, j), (i-2, j)]
 
 oppositeOrientation :: String -> String
 oppositeOrientation "UP" = "DOWN"
@@ -42,18 +42,18 @@ initialMap x_size y_size = Map newSnake newFood x_size y_size
           newFood = spawnFood x_size y_size newSnake
 
 snakeNewHead :: Snake -> (Integer, Integer)
-snakeNewHead (Snake d c) | d == "UP" = (fst $ head c, (snd $ head c) + 1)
-                         | d == "DOWN" = (fst $ head c, (snd $ head c) - 1)
-                         | d == "LEFT" =  ((fst $ head c)-1, snd $ head c)
-                         | d == "RIGHT" =  ((fst $ head c)+1, snd $ head c)
+snakeNewHead (Snake d c) | d == "UP" = ((fst $ head c) + 1, snd $ head c)
+                         | d == "DOWN" = ((fst $ head c) - 1, snd $ head c)
+                         | d == "LEFT" =  (fst $ head c, (snd $ head c) - 1)
+                         | d == "RIGHT" =  (fst $ head c, (snd $ head c) + 1)
 
 nextMovementValid :: Map -> Bool
-nextMovementValid (Map s f x_max y_max ) | coordinateInSnake newHead s = False
-                                         | fst newHead > x_max = False
-                                         | fst newHead < 0 = False
-                                         | snd newHead > y_max = False
-                                         | snd newHead < 0 = False
-                                         | otherwise = True
+nextMovementValid (Map s _ x_max y_max) | coordinateInSnake newHead s = False
+                                        | fst newHead > x_max = False
+                                        | fst newHead < 0 = False
+                                        | snd newHead > y_max = False
+                                        | snd newHead < 0 = False
+                                        | otherwise = True
     where newHead = snakeNewHead s
 
 eatingFoodInNextMovement :: Map -> Bool
@@ -85,32 +85,29 @@ iterateMapEatingFood (Map s _ x y) = Map newSnake newFood x y
     where newSnake = moveSnakeEatingFood s
           newFood = spawnFood x y s
 
-drawFood w (Food x y) = updateWindow w $ do
+drawFood (Food x y) = do
     moveCursor x y
     drawString "*"
 
-drawSnake w (Snake d c) = do
-    case c of
-        [] -> return ()
-        x -> updateWindow w $ do
-            moveCursor (fst $ head x) (snd $ head x)
-            drawString "*"
-            drawSnake w (Snake d (tail x))
-            return ()
+drawSnake (Snake d c) = do
+    when (length c > 0) $ do
+        moveCursor (fst $ head c) (snd $ head c)
+        drawString "*"
+        drawSnake (Snake d (tail c))
 
-play w (Map s f x y ) = do
+play w (Map s f x y) = do
     let m = (Map s f x y)
     updateWindow w $ do
         clear
-    drawSnake w s
-    drawFood w f
+        drawSnake s
+        drawFood f
     render
-    if not $ nextMovementValid m
-        then return ()
-        else if eatingFoodInNextMovement m
-            then play w (iterateMapEatingFood m)
-            else
-                play w (iterateMap m)
+    --if not $ nextMovementValid m
+    --    then return ()
+    --    else if eatingFoodInNextMovement m
+    --        then play w (iterateMapEatingFood m)
+    --        else
+    --            play w (iterateMap m)
 
 main = runCurses $ do
     win <- defaultWindow

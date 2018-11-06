@@ -130,9 +130,10 @@ play w (Map s f x y) score time = do
     drawGame w s f score
     render
     new_direction <- getDirection w (Just time)
-    let new_s = changeSnakeDirection new_direction s
-    let m = (Map new_s f x y)
+    let m = (Map s f x y)
     when (nextMovementValid m) $ do
+        let new_s = changeSnakeDirection new_direction s
+        let m = (Map new_s f x y)
         if (eatingFoodInNextMovement m)
             then play w (iterateMapEatingFood m) (score+100) (round $ (fromIntegral time) * 0.65)
             else play w (iterateMap m) score time

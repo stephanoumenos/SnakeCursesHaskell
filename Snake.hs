@@ -19,9 +19,10 @@ oppositeOrientation "DOWN" = "UP"
 oppositeOrientation "LEFT" = "RIGHT"
 oppositeOrientation "RIGHT" = "LEFT"
 
-changeSnakeOrientation :: String -> Snake -> Snake
-changeSnakeOrientation new_d (Snake d c) | new_d == oppositeOrientation d = (Snake d c)
-                                         | otherwise = (Snake new_d c)
+changeSnakeDirection :: Maybe String -> Snake -> Snake
+changeSnakeDirection Nothing s = s
+changeSnakeDirection (Just new_d) (Snake d c) | new_d == oppositeOrientation d = (Snake d c)
+                                              | otherwise = (Snake new_d c)
 
 getRand :: Integer -> Integer
 getRand max = unsafePerformIO $ randomRIO (0, max)
@@ -42,16 +43,16 @@ initialMap x_size y_size = Map newSnake newFood x_size y_size
           newFood = spawnFood x_size y_size newSnake
 
 snakeNewHead :: Snake -> (Integer, Integer)
-snakeNewHead (Snake d c) | d == "UP" = ((fst $ head c) + 1, snd $ head c)
-                         | d == "DOWN" = ((fst $ head c) - 1, snd $ head c)
+snakeNewHead (Snake d c) | d == "UP" = ((fst $ head c) - 1, snd $ head c)
+                         | d == "DOWN" = ((fst $ head c) + 1, snd $ head c)
                          | d == "LEFT" =  (fst $ head c, (snd $ head c) - 1)
                          | d == "RIGHT" =  (fst $ head c, (snd $ head c) + 1)
 
 nextMovementValid :: Map -> Bool
 nextMovementValid (Map s _ x_max y_max) | coordinateInSnake newHead s = False
-                                        | fst newHead > x_max = False
+                                        | fst newHead >= x_max = False
                                         | fst newHead < 0 = False
-                                        | snd newHead > y_max = False
+                                        | snd newHead >= y_max = False
                                         | snd newHead < 0 = False
                                         | otherwise = True
     where newHead = snakeNewHead s
@@ -85,43 +86,48 @@ iterateMapEatingFood (Map s _ x y) = Map newSnake newFood x y
     where newSnake = moveSnakeEatingFood s
           newFood = spawnFood x y s
 
+drawFood :: Food -> Update ()
 drawFood (Food x y) = do
     moveCursor x y
     drawString "*"
 
+drawSnake :: Snake -> Update ()
 drawSnake (Snake d c) = do
     when (length c > 0) $ do
         moveCursor (fst $ head c) (snd $ head c)
         drawString "*"
         drawSnake (Snake d (tail c))
 
+getDirection :: Window -> Curses (Maybe String)
+getDirection w = do
+    ev <- getEvent w (Just 500)
+    return (getKeyPressed ev)
+
+getKeyPressed :: Maybe Event -> Maybe String
+getKeyPressed Nothing = Nothing
+getKeyPressed (Just k) | k == EventSpecialKey KeyUpArrow || k == EventCharacter 'w' = Just "UP"
+                       | k == EventSpecialKey KeyDownArrow || k == EventCharacter 's' = Just "DOWN"
+                       | k == EventSpecialKey KeyLeftArrow || k == EventCharacter 'a' = Just "LEFT"
+                       | k == EventSpecialKey KeyRightArrow || k == EventCharacter 'd' = Just "RIGHT"
+                       | otherwise = Nothing
+
 play w (Map s f x y) = do
-    let m = (Map s f x y)
     updateWindow w $ do
         clear
         drawSnake s
         drawFood f
     render
-    --if not $ nextMovementValid m
-    --    then return ()
-    --    else if eatingFoodInNextMovement m
-    --        then play w (iterateMapEatingFood m)
-    --        else
-    --            play w (iterateMap m)
+    new_direction <- getDirection w
+    let new_s = changeSnakeDirection new_direction s
+    let m = (Map new_s f x y)
+    when (nextMovementValid m) $ do
+        if (eatingFoodInNextMovement m)
+            then play w (iterateMapEatingFood m)
+            else play w (iterateMap m)
 
 main = runCurses $ do
     win <- defaultWindow
     cid <- newColorID ColorRed ColorWhite 1
     (h, w) <- screenSize
-    play win (initialMap h w)
-    render
-    waitFor win (\ev -> ev == EventCharacter 'q' || ev == EventCharacter 'Q')
-
-waitFor :: Window -> (Event -> Bool) -> Curses ()
-waitFor w p = loop where
-    loop = do
-        ev <- getEvent w Nothing
-        case ev of
-            Nothing -> loop
-            Just ev' -> if p ev' then return () else loop
+    play win (initialMap (h-1) (w-1))
 

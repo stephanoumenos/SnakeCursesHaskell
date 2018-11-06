@@ -4,24 +4,26 @@ import UI.NCurses
 import Control.Monad
 
 -- The Snake has a direction and its body coordinates
-data Snake = Snake String [(Integer, Integer)] deriving (Show)
+data Snake = Snake Direction [(Integer, Integer)]
 -- The food has its coordinates
-data Food = Food Integer Integer deriving (Show)
+data Food = Food Integer Integer
 -- The map has a snake, a food, and its boundaries (max_x and max_y)
-data Map = Map Snake Food Integer Integer deriving (Show)
+data Map = Map Snake Food Integer Integer
+
+data Direction = UP | DOWN | LEFT | RIGHT deriving (Eq)
 
 makeNewSnake :: Integer -> Integer -> Snake
-makeNewSnake i j = Snake "UP" [(i, j), (i+1, j), (i+2, j)]
+makeNewSnake i j = Snake UP [(i, j), (i+1, j), (i+2, j)]
 
-oppositeOrientation :: String -> String
-oppositeOrientation "UP" = "DOWN"
-oppositeOrientation "DOWN" = "UP"
-oppositeOrientation "LEFT" = "RIGHT"
-oppositeOrientation "RIGHT" = "LEFT"
+oppositeDirection :: Direction -> Direction
+oppositeDirection UP = DOWN
+oppositeDirection DOWN = UP
+oppositeDirection LEFT = RIGHT
+oppositeDirection RIGHT = LEFT
 
-changeSnakeDirection :: Maybe String -> Snake -> Snake
+changeSnakeDirection :: Maybe Direction -> Snake -> Snake
 changeSnakeDirection Nothing s = s
-changeSnakeDirection (Just new_d) (Snake d c) | new_d == oppositeOrientation d = (Snake d c)
+changeSnakeDirection (Just new_d) (Snake d c) | new_d == oppositeDirection d = (Snake d c)
                                               | otherwise = (Snake new_d c)
 
 getRand :: Integer -> Integer
@@ -43,10 +45,10 @@ initialMap x_size y_size = Map newSnake newFood x_size y_size
           newFood = spawnFood x_size y_size newSnake
 
 snakeNewHead :: Snake -> (Integer, Integer)
-snakeNewHead (Snake d c) | d == "UP" = ((fst $ head c) - 1, snd $ head c)
-                         | d == "DOWN" = ((fst $ head c) + 1, snd $ head c)
-                         | d == "LEFT" =  (fst $ head c, (snd $ head c) - 1)
-                         | d == "RIGHT" =  (fst $ head c, (snd $ head c) + 1)
+snakeNewHead (Snake d c) | d == UP = ((fst $ head c) - 1, snd $ head c)
+                         | d == DOWN = ((fst $ head c) + 1, snd $ head c)
+                         | d == LEFT =  (fst $ head c, (snd $ head c) - 1)
+                         | d == RIGHT =  (fst $ head c, (snd $ head c) + 1)
 
 nextMovementValid :: Map -> Bool
 nextMovementValid (Map s _ x_max y_max) | coordinateInSnake newHead s = False
@@ -98,44 +100,46 @@ drawSnake (Snake d c) = do
         drawString "■"
         drawSnake (Snake d (tail c))
 
-drawScore :: Integer -> Update()
+drawScore :: Integer -> Update ()
 drawScore x = do
     moveCursor 0 0
     drawString ("Score: " ++ (show x))
 
-getDirection :: Window -> Maybe Integer -> Curses (Maybe String)
+getDirection :: Window -> Maybe Integer -> Curses (Maybe Direction)
 getDirection w t = do
     ev <- getEvent w t
     return (getKeyPressed ev)
 
-getKeyPressed :: Maybe Event -> Maybe String
+getKeyPressed :: Maybe Event -> Maybe Direction
 getKeyPressed Nothing = Nothing
-getKeyPressed (Just k) | k == EventSpecialKey KeyUpArrow || k == EventCharacter 'w' = Just "UP"
-                       | k == EventSpecialKey KeyDownArrow || k == EventCharacter 's' = Just "DOWN"
-                       | k == EventSpecialKey KeyLeftArrow || k == EventCharacter 'a' = Just "LEFT"
-                       | k == EventSpecialKey KeyRightArrow || k == EventCharacter 'd' = Just "RIGHT"
+getKeyPressed (Just k) | k == EventSpecialKey KeyUpArrow || k == EventCharacter 'w' = Just UP
+                       | k == EventSpecialKey KeyDownArrow || k == EventCharacter 's' = Just DOWN
+                       | k == EventSpecialKey KeyLeftArrow || k == EventCharacter 'a' = Just LEFT
+                       | k == EventSpecialKey KeyRightArrow || k == EventCharacter 'd' = Just RIGHT
                        | otherwise = Nothing
 
+drawGame :: Window -> Snake -> Food -> Integer -> Curses ()
+drawGame w s f score = updateWindow w $ do
+    clear
+    drawSnake s
+    drawFood f
+    drawScore score
+
 play :: Window -> Map -> Integer -> Integer -> Curses ()
-play w (Map s f x y) score t = do
-    updateWindow w $ do
-        clear
-        drawSnake s
-        drawFood f
-        drawScore score
+play w (Map s f x y) score time = do
+    drawGame w s f score
     render
-    new_direction <- getDirection w (Just t)
+    new_direction <- getDirection w (Just time)
     let new_s = changeSnakeDirection new_direction s
     let m = (Map new_s f x y)
     when (nextMovementValid m) $ do
         if (eatingFoodInNextMovement m)
-            then play w (iterateMapEatingFood m) (score+100) (round $ (fromIntegral t) * 0.65)
-            else play w (iterateMap m) score t
+            then play w (iterateMapEatingFood m) (score+100) (round $ (fromIntegral time) * 0.65)
+            else play w (iterateMap m) score time
 
 main = runCurses $ do
     setCursorMode CursorInvisible
     win <- defaultWindow
-    cid <- newColorID ColorRed ColorWhite 1
     (h, w) <- screenSize
     play win (initialMap (h-1) (w-1)) 0 350
 

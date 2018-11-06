@@ -11,7 +11,7 @@ data Food = Food Integer Integer deriving (Show)
 data Map = Map Snake Food Integer Integer deriving (Show)
 
 makeNewSnake :: Integer -> Integer -> Snake
-makeNewSnake i j = Snake "UP" [(i, j), (i-1, j), (i-2, j)]
+makeNewSnake i j = Snake "UP" [(i, j), (i+1, j), (i+2, j)]
 
 oppositeOrientation :: String -> String
 oppositeOrientation "UP" = "DOWN"
@@ -95,12 +95,17 @@ drawSnake :: Snake -> Update ()
 drawSnake (Snake d c) = do
     when (length c > 0) $ do
         moveCursor (fst $ head c) (snd $ head c)
-        drawString "*"
+        drawString "■"
         drawSnake (Snake d (tail c))
 
-getDirection :: Window -> Curses (Maybe String)
-getDirection w = do
-    ev <- getEvent w (Just 500)
+drawScore :: Integer -> Update()
+drawScore x = do
+    moveCursor 0 0
+    drawString ("Score: " ++ (show x))
+
+getDirection :: Window -> Maybe Integer -> Curses (Maybe String)
+getDirection w t = do
+    ev <- getEvent w t
     return (getKeyPressed ev)
 
 getKeyPressed :: Maybe Event -> Maybe String
@@ -111,23 +116,26 @@ getKeyPressed (Just k) | k == EventSpecialKey KeyUpArrow || k == EventCharacter 
                        | k == EventSpecialKey KeyRightArrow || k == EventCharacter 'd' = Just "RIGHT"
                        | otherwise = Nothing
 
-play w (Map s f x y) = do
+play :: Window -> Map -> Integer -> Integer -> Curses ()
+play w (Map s f x y) score t = do
     updateWindow w $ do
         clear
         drawSnake s
         drawFood f
+        drawScore score
     render
-    new_direction <- getDirection w
+    new_direction <- getDirection w (Just t)
     let new_s = changeSnakeDirection new_direction s
     let m = (Map new_s f x y)
     when (nextMovementValid m) $ do
         if (eatingFoodInNextMovement m)
-            then play w (iterateMapEatingFood m)
-            else play w (iterateMap m)
+            then play w (iterateMapEatingFood m) (score+100) (round $ (fromIntegral t) * 0.65)
+            else play w (iterateMap m) score t
 
 main = runCurses $ do
+    setCursorMode CursorInvisible
     win <- defaultWindow
     cid <- newColorID ColorRed ColorWhite 1
     (h, w) <- screenSize
-    play win (initialMap (h-1) (w-1))
+    play win (initialMap (h-1) (w-1)) 0 350
 

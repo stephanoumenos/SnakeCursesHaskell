@@ -1,6 +1,8 @@
 # SnakeCursesHaskell
 
-This is a Snake games done with Haskell. I tried to make the code as clear as possible.
+This is a Snake game done with Haskell. I tried to make the code as clear as possible.
+
+![](gif/demo.gif)
 
 My main goal doing this was learning Haskell while doing it, and I feel it was great in that regard! Not only it was loads of fun, I came in contact with many of the language's features. I feel it was really helpful in doing so!
 

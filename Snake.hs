@@ -112,10 +112,10 @@ getDirection w t = do
 
 getKeyPressed :: Maybe Event -> Maybe Direction
 getKeyPressed Nothing = Nothing
-getKeyPressed (Just k) | k == EventSpecialKey KeyUpArrow || k == EventCharacter 'w' = Just UP
-                       | k == EventSpecialKey KeyDownArrow || k == EventCharacter 's' = Just DOWN
-                       | k == EventSpecialKey KeyLeftArrow || k == EventCharacter 'a' = Just LEFT
-                       | k == EventSpecialKey KeyRightArrow || k == EventCharacter 'd' = Just RIGHT
+getKeyPressed (Just k) | k == EventSpecialKey KeyUpArrow || k == EventCharacter 'w' || k == EventCharacter 'k' = Just UP
+                       | k == EventSpecialKey KeyDownArrow || k == EventCharacter 's' || k == EventCharacter 'j' = Just DOWN
+                       | k == EventSpecialKey KeyLeftArrow || k == EventCharacter 'a'|| k == EventCharacter 'h' = Just LEFT
+                       | k == EventSpecialKey KeyRightArrow || k == EventCharacter 'd' || k == EventCharacter 'l' = Just RIGHT
                        | otherwise = Nothing
 
 drawGame :: Window -> Snake -> Food -> Integer -> Curses ()

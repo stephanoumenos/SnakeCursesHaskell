@@ -1,7 +1,7 @@
 import System.Random
-import System.IO.Unsafe
 import UI.NCurses
 import Control.Monad
+import Control.Monad.IO.Class
 
 -- The Snake has a direction and its body coordinates
 data Snake = Snake Direction [(Integer, Integer)]
@@ -26,23 +26,24 @@ changeSnakeDirection Nothing s = s
 changeSnakeDirection (Just new_d) (Snake d c) | new_d == oppositeDirection d = (Snake d c)
                                               | otherwise = (Snake new_d c)
 
-getRand :: Integer -> Integer
-getRand max = unsafePerformIO $ randomRIO (0, max)
+randomFood :: Integer -> Integer -> IO (Food)
+randomFood max_x max_y = do
+    randomX <- randomRIO (0, max_x)
+    randomY <- randomRIO (0, max_y)
+    return $ Food randomX randomY
 
-randomFood :: Integer -> Integer -> Food
-randomFood max_x max_y = Food randomX randomY
-    where randomX = getRand max_x
-          randomY = getRand max_y
+spawnFood :: Integer -> Integer -> Snake -> IO (Food)
+spawnFood max_x max_y s = do
+    newFood <- randomFood max_x max_y
+    if (foodInSnake newFood s)
+       then return =<< spawnFood max_x max_y s
+       else return $ newFood
 
-spawnFood :: Integer -> Integer -> Snake -> Food
-spawnFood max_x max_y s | foodInSnake newFood s = spawnFood max_x max_y s
-                        | otherwise = newFood
-    where newFood = randomFood max_x max_y
-
-initialMap :: Integer -> Integer -> Map
-initialMap x_size y_size = Map newSnake newFood x_size y_size
-    where newSnake = makeNewSnake (quot x_size 2) (quot y_size 2)
-          newFood = spawnFood x_size y_size newSnake
+initialMap :: Integer -> Integer -> IO (Map)
+initialMap x_size y_size = do
+    let newSnake = makeNewSnake (quot x_size 2) (quot y_size 2)
+    newFood <- spawnFood x_size y_size newSnake
+    return $ Map newSnake newFood x_size y_size
 
 snakeNewHead :: Snake -> (Integer, Integer)
 snakeNewHead (Snake d c) | d == UP = ((fst $ head c) - 1, snd $ head c)
@@ -83,10 +84,11 @@ coordinateInSnake coordinate (Snake d c) = elem coordinate c
 iterateMap :: Map -> Map
 iterateMap (Map s f x y) = Map (moveSnake s) f x y
 
-iterateMapEatingFood :: Map -> Map
-iterateMapEatingFood (Map s _ x y) = Map newSnake newFood x y
-    where newSnake = moveSnakeEatingFood s
-          newFood = spawnFood x y s
+iterateMapEatingFood :: Map -> IO (Map)
+iterateMapEatingFood (Map s _ x y) = do
+    let newSnake = moveSnakeEatingFood s
+    newFood <- spawnFood x y s
+    return $ Map newSnake newFood x y
 
 drawFood :: Food -> Update ()
 drawFood (Food x y) = do
@@ -125,7 +127,6 @@ drawGame w s f score = updateWindow w $ do
     drawFood f
     drawScore score
 
-play :: Window -> Map -> Integer -> Integer -> Curses ()
 play w (Map s f x y) score time = do
     drawGame w s f score
     render
@@ -135,12 +136,15 @@ play w (Map s f x y) score time = do
         let new_s = changeSnakeDirection new_direction s
         let m = (Map new_s f x y)
         if (eatingFoodInNextMovement m)
-            then play w (iterateMapEatingFood m) (score+100) (round $ (fromIntegral time) * 0.65)
+            then do
+                newM <- liftIO $ iterateMapEatingFood m
+                play w newM (score+100) (round $ (fromIntegral time) * 0.65)
             else play w (iterateMap m) score time
 
 main = runCurses $ do
     setCursorMode CursorInvisible
     win <- defaultWindow
     (h, w) <- screenSize
-    play win (initialMap (h-1) (w-1)) 0 350
+    m <- liftIO $ initialMap (h-1) (w-1)
+    play win m 0 350
 
